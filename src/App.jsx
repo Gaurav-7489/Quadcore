@@ -64,10 +64,12 @@ function CameraApp({ mode, onSwitchMode }) {
   const arLoopRef = useRef(null);
   const isNavigatingRef = useRef(false);
   const lastSpokeTimeRef = useRef(0);
+  const abortControllerRef = useRef(null);
 
   const [cameraReady, setCameraReady] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState('idle');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSpeakingResult, setIsSpeakingResult] = useState(false);
   const [processingLabel, setProcessingLabel] = useState('Analyzing...');
   const [response, setResponse] = useState(null);
   const [responseLabel, setResponseLabel] = useState('');
@@ -198,13 +200,43 @@ function CameraApp({ mode, onSwitchMode }) {
     detectFrame();
   }, [cameraReady, langKey, language, stopWalkMode]);
 
-  // Cleanup walk mode on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       isNavigatingRef.current = false;
       if (arLoopRef.current) cancelAnimationFrame(arLoopRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
     };
   }, []);
+
+  // ---- Stop everything ----
+  const stopEverything = useCallback(() => {
+    // Cancel in-flight API request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    // Stop speech
+    voiceService.stopSpeaking();
+    // Stop walk mode
+    if (isWalking) {
+      isNavigatingRef.current = false;
+      setIsWalking(false);
+      if (arLoopRef.current) {
+        cancelAnimationFrame(arLoopRef.current);
+        arLoopRef.current = null;
+      }
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+    // Reset processing state
+    setIsProcessing(false);
+    setIsSpeakingResult(false);
+    voiceService.speak(langKey === 'hi' ? 'Ruk gaya.' : 'Stopped.', language);
+  }, [isWalking, langKey, language]);
 
   // ---- Action handler ----
   const handleAction = useCallback(async (action, query = '') => {
@@ -219,7 +251,12 @@ function CameraApp({ mode, onSwitchMode }) {
     }
 
     setIsProcessing(true);
+    setIsSpeakingResult(false);
     setResponse(null);
+
+    // Create abort controller for this request
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    abortControllerRef.current = new AbortController();
 
     const labels = {
       describe_scene: '👁️ Scene Description',
@@ -248,6 +285,9 @@ function CameraApp({ mode, onSwitchMode }) {
 
       await voiceService.speak(statusMessages[action] || 'Processing...');
 
+      // Check if aborted while speaking status
+      if (abortControllerRef.current?.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+
       let result;
       switch (action) {
         case 'describe_scene':
@@ -272,6 +312,9 @@ function CameraApp({ mode, onSwitchMode }) {
           result = await askAI(frame, query || action, langKey);
       }
 
+      // Check if aborted while waiting for API
+      if (abortControllerRef.current?.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+
       setResponse(result);
       lastResponseRef.current = result;
 
@@ -284,8 +327,16 @@ function CameraApp({ mode, onSwitchMode }) {
         }, ...prev.slice(0, 4)]);
       }
 
+      setIsProcessing(false);
+      setIsSpeakingResult(true);
       await voiceService.speak(result, language);
+      setIsSpeakingResult(false);
     } catch (err) {
+      if (err.name === 'AbortError') {
+        // User cancelled — don't show error
+        console.log('[Action] Cancelled by user.');
+        return;
+      }
       console.error('[Action Error]', err);
       const errorMsg = 'Sorry, something went wrong. Please try again.';
       setResponse(errorMsg);
@@ -293,6 +344,8 @@ function CameraApp({ mode, onSwitchMode }) {
       await voiceService.speak(errorMsg);
     } finally {
       setIsProcessing(false);
+      setIsSpeakingResult(false);
+      abortControllerRef.current = null;
     }
   }, [isProcessing, isWalking, cameraReady, langKey, language, isDemo, stopWalkMode]);
 
@@ -333,8 +386,7 @@ function CameraApp({ mode, onSwitchMode }) {
         handleAction('detect_objects');
         break;
       case 'stop':
-        voiceService.stopSpeaking();
-        setIsProcessing(false);
+        stopEverything();
         break;
       case 'repeat':
         if (lastResponseRef.current) {
@@ -461,12 +513,26 @@ function CameraApp({ mode, onSwitchMode }) {
         </div>
       )}
 
-      {/* Processing overlay */}
+      {/* Processing overlay — tappable to stop */}
       {isProcessing && (
-        <div className="processing-overlay">
+        <div className="processing-overlay" onClick={stopEverything} style={{ cursor: 'pointer' }}>
           <div className="processing-ring" />
           <span className="processing-text">{processingLabel}</span>
+          <button className="stop-btn" onClick={(e) => { e.stopPropagation(); stopEverything(); }}>
+            🛑 Stop
+          </button>
         </div>
+      )}
+
+      {/* Stop button while speaking result */}
+      {isSpeakingResult && !isProcessing && (
+        <button
+          className="stop-floating-btn"
+          onClick={stopEverything}
+          aria-label="Stop speaking"
+        >
+          🛑 Stop
+        </button>
       )}
 
       {/* DEMO MODE: Response Panel */}
