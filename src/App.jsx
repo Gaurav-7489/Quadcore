@@ -122,6 +122,88 @@ function CameraApp({ mode, onSwitchMode, onResetMode }) {
     voiceService.speak(langKey === 'hi' ? 'Navigation band.' : 'Walk mode stopped.');
   }, [langKey]);
 
+  // ---- Walk Mode: Enhanced Navigation ----
+
+  // Danger classification for detected objects
+  const getDangerLevel = useCallback((className) => {
+    const highDanger = ['car', 'truck', 'bus', 'motorcycle', 'bicycle', 'train'];
+    const mediumDanger = ['person', 'dog', 'cat', 'horse', 'cow', 'sheep'];
+    const lowDanger = ['chair', 'couch', 'potted plant', 'dining table', 'bench', 'fire hydrant', 'parking meter', 'stop sign', 'traffic light'];
+    const cls = className.toLowerCase();
+    if (highDanger.includes(cls)) return { level: 3, label: 'DANGER', color: '#ff0000' };
+    if (mediumDanger.includes(cls)) return { level: 2, label: 'CAUTION', color: '#ff4757' };
+    if (lowDanger.includes(cls)) return { level: 1, label: 'OBSTACLE', color: '#ffa502' };
+    return { level: 1, label: 'OBSTACLE', color: '#ffa502' };
+  }, []);
+
+  // Estimate distance from bounding box area ratio
+  const estimateDistance = useCallback((areaRatio) => {
+    if (areaRatio > 0.40) return { label: 'extremely close', urgency: 4 };
+    if (areaRatio > 0.25) return { label: 'very close', urgency: 3 };
+    if (areaRatio > 0.10) return { label: 'close', urgency: 2 };
+    if (areaRatio > 0.04) return { label: 'approaching', urgency: 1 };
+    return { label: 'far', urgency: 0 };
+  }, []);
+
+  // Get position label (5 zones instead of 3)
+  const getPosition = useCallback((centerX, canvasWidth) => {
+    const ratio = centerX / canvasWidth;
+    if (ratio < 0.2) return { zone: 'far left', direction: 'left', hindiZone: 'baayein door' };
+    if (ratio < 0.4) return { zone: 'left', direction: 'left', hindiZone: 'baayein' };
+    if (ratio < 0.6) return { zone: 'ahead', direction: 'center', hindiZone: 'saamne' };
+    if (ratio < 0.8) return { zone: 'right', direction: 'right', hindiZone: 'daayein' };
+    return { zone: 'far right', direction: 'right', hindiZone: 'daayein door' };
+  }, []);
+
+  // Find the safest direction based on obstacle positions
+  const findSafePath = useCallback((obstacles, canvasWidth) => {
+    const zones = { left: 0, center: 0, right: 0 };
+    obstacles.forEach(obs => {
+      const cx = obs.bbox[0] + obs.bbox[2] / 2;
+      if (cx < canvasWidth * 0.33) zones.left += obs.dangerScore;
+      else if (cx > canvasWidth * 0.66) zones.right += obs.dangerScore;
+      else zones.center += obs.dangerScore;
+    });
+
+    if (zones.center === 0 && zones.left === 0 && zones.right === 0) return 'clear';
+    if (zones.center === 0) return 'straight';
+    if (zones.left <= zones.right && zones.left < zones.center) return 'left';
+    if (zones.right < zones.left && zones.right < zones.center) return 'right';
+    if (zones.left === 0) return 'left';
+    if (zones.right === 0) return 'right';
+    return 'stop';
+  }, []);
+
+  // Periodic AI scene scan for stairs, curbs, elevation changes
+  const lastSceneScanRef = useRef(0);
+  const scanSceneForHazards = useCallback(async () => {
+    if (!cameraReady || !isNavigatingRef.current) return;
+    const now = Date.now();
+    // Only scan every 12 seconds to avoid API spam
+    if (now - lastSceneScanRef.current < 12000) return;
+    lastSceneScanRef.current = now;
+
+    try {
+      const frame = cameraService.captureFrame(0.5);
+      if (!frame) return;
+
+      const hazardPrompt = 'You are a navigation assistant for a blind person walking RIGHT NOW. In ONE short sentence (max 12 words), report ONLY immediate walking hazards visible: stairs going up or down, steps, curbs, slopes, uneven ground, holes, puddles, construction, wet floor, or drop-offs. If the path looks clear and flat, say exactly "Path clear ahead." Do NOT describe objects, people, or scenery.';
+      const result = await askAI(frame, hazardPrompt, langKey);
+
+      if (result && isNavigatingRef.current) {
+        const lower = result.toLowerCase();
+        // Only speak if it mentions a real hazard (not just "path clear")
+        const hazardWords = ['stair', 'step', 'curb', 'slope', 'hole', 'puddle', 'uneven', 'construction', 'drop', 'ramp', 'bump', 'crack', 'wet', 'slippery', 'narrow', 'edge', 'ditch', 'broken', 'obstacle'];
+        const hasHazard = hazardWords.some(w => lower.includes(w));
+        if (hasHazard) {
+          voiceService.speak(`Warning. ${result}`, language);
+        }
+      }
+    } catch (err) {
+      console.error('[Walk Scene Scan] Error:', err);
+    }
+  }, [cameraReady, langKey, language]);
+
   const startWalkMode = useCallback(async () => {
     if (!cameraReady || !videoRef.current || !canvasRef.current) {
       voiceService.speak('Camera not ready.');
@@ -130,7 +212,9 @@ function CameraApp({ mode, onSwitchMode, onResetMode }) {
 
     isNavigatingRef.current = true;
     setIsWalking(true);
-    voiceService.speak(langKey === 'hi' ? 'Live tracking shuru.' : 'Live tracking started. Loading model...');
+    voiceService.speak(langKey === 'hi'
+      ? 'Walk mode shuru. Model load ho raha hai. Aap chalte rahiye, mai aapko guide karunga.'
+      : 'Walk mode started. Loading model. I will guide you as you walk.');
 
     if (!modelRef.current) {
       setIsProcessing(true);
@@ -138,7 +222,9 @@ function CameraApp({ mode, onSwitchMode, onResetMode }) {
       try {
         await tf.ready();
         modelRef.current = await cocossd.load({ base: 'lite_mobilenet_v2' });
-        voiceService.speak(langKey === 'hi' ? 'Ready. Chalte rahiye.' : 'Ready. Keep walking.');
+        voiceService.speak(langKey === 'hi'
+          ? 'Model ready. Mai aapko batata rahunga. Chaliye.'
+          : 'Model ready. I will announce obstacles, directions, and hazards. Start walking.');
       } catch (err) {
         console.error('Failed to load COCO-SSD', err);
         voiceService.speak('Failed to load live tracking.');
@@ -155,42 +241,167 @@ function CameraApp({ mode, onSwitchMode, onResetMode }) {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
+    let lastClearAnnounce = Date.now();
+    let frameCount = 0;
+
     const detectFrame = async () => {
       if (!isNavigatingRef.current || !modelRef.current) return;
+      frameCount++;
+
       try {
         const predictions = await modelRef.current.detect(video);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        let immediateObstacle = null;
+        // ---- Analyze all obstacles ----
+        const obstacles = [];
         predictions.forEach(pred => {
+          if (pred.score < 0.45) return; // Skip low-confidence detections
+
           const [x, y, width, height] = pred.bbox;
           const areaRatio = (width * height) / (canvas.width * canvas.height);
-          const isImmediate = areaRatio > 0.25;
-          const centerX = x + (width / 2);
-          let position = 'center';
-          if (centerX < canvas.width * 0.33) position = 'left';
-          else if (centerX > canvas.width * 0.66) position = 'right';
+          const centerX = x + width / 2;
+          const bottomY = y + height; // Lower = closer to camera
+          const pos = getPosition(centerX, canvas.width);
+          const danger = getDangerLevel(pred.class);
+          const distance = estimateDistance(areaRatio);
 
-          if (isImmediate && (!immediateObstacle || pred.score > immediateObstacle.score)) {
-            immediateObstacle = { ...pred, position };
+          // Combined danger score (danger level × urgency × bottom position weight)
+          const bottomWeight = bottomY / canvas.height; // Objects at bottom of frame = closer
+          const dangerScore = danger.level * (distance.urgency + 1) * (1 + bottomWeight);
+
+          obstacles.push({
+            ...pred,
+            areaRatio,
+            position: pos,
+            danger,
+            distance,
+            dangerScore,
+            bottomY,
+          });
+
+          // ---- Draw enhanced bounding boxes ----
+          const isUrgent = distance.urgency >= 2;
+          const boxColor = isUrgent ? danger.color : '#2ed573';
+
+          // Box
+          ctx.strokeStyle = boxColor;
+          ctx.lineWidth = isUrgent ? 5 : 2;
+          ctx.strokeRect(x, y, width, height);
+
+          // Semi-transparent fill for dangerous objects
+          if (isUrgent) {
+            ctx.fillStyle = `${boxColor}22`;
+            ctx.fillRect(x, y, width, height);
           }
 
-          ctx.strokeStyle = isImmediate ? '#ff4757' : '#2ed573';
-          ctx.lineWidth = isImmediate ? 6 : 3;
-          ctx.strokeRect(x, y, width, height);
-          ctx.fillStyle = isImmediate ? '#ff4757' : '#2ed573';
-          ctx.font = 'bold 24px Arial';
-          ctx.fillText(`${pred.class} (${Math.round(pred.score * 100)}%)`, x, y > 24 ? y - 5 : y + 24);
+          // Label background
+          const label = `${pred.class} · ${distance.label}`;
+          ctx.font = 'bold 18px Arial';
+          const textWidth = ctx.measureText(label).width;
+          ctx.fillStyle = 'rgba(0,0,0,0.75)';
+          ctx.fillRect(x, y > 28 ? y - 28 : y, textWidth + 12, 24);
+
+          // Label text
+          ctx.fillStyle = boxColor;
+          ctx.fillText(label, x + 6, y > 28 ? y - 8 : y + 18);
+
+          // Direction arrow for urgent obstacles
+          if (isUrgent) {
+            ctx.fillStyle = boxColor;
+            ctx.font = 'bold 32px Arial';
+            const arrow = pos.direction === 'left' ? '⬅' : pos.direction === 'right' ? '➡' : '⬆';
+            ctx.fillText(arrow, x + width / 2 - 16, y + height / 2);
+          }
         });
 
+        // ---- Sort by danger score ----
+        obstacles.sort((a, b) => b.dangerScore - a.dangerScore);
+
+        // ---- Voice announcements ----
         const now = Date.now();
-        if (immediateObstacle && (now - lastSpokeTimeRef.current > 3500)) {
+        const timeSinceSpoke = now - lastSpokeTimeRef.current;
+
+        // Find the safest direction
+        const safePath = findSafePath(obstacles, canvas.width);
+
+        // HIGH URGENCY: Immediate danger (very close + dangerous)
+        const immediateDangers = obstacles.filter(o => o.distance.urgency >= 3);
+        if (immediateDangers.length > 0 && timeSinceSpoke > 2000) {
           lastSpokeTimeRef.current = now;
-          const msg = langKey === 'hi'
-            ? `Dhyan dein, aapke ${immediateObstacle.position === 'center' ? 'saamne' : immediateObstacle.position === 'left' ? 'baayein' : 'daayein'} ek ${immediateObstacle.class} hai.`
-            : `Caution. ${immediateObstacle.class} immediately to your ${immediateObstacle.position}.`;
+          const top = immediateDangers[0];
+
+          let msg;
+          if (langKey === 'hi') {
+            const directionHi = safePath === 'left' ? 'Baayein jayein' : safePath === 'right' ? 'Daayein jayein' : safePath === 'stop' ? 'Ruk jayein' : 'Seedha chalein';
+            msg = `${top.danger.label === 'DANGER' ? 'KHATARA!' : 'Savdhaan!'} ${top.class} bilkul ${top.position.hindiZone}. ${directionHi}.`;
+          } else {
+            const directionEn = safePath === 'left' ? 'Move left' : safePath === 'right' ? 'Move right' : safePath === 'stop' ? 'Stop now' : 'Keep straight';
+            msg = `${top.danger.label}! ${top.class} ${top.distance.label}, ${top.position.zone}. ${directionEn}.`;
+          }
           voiceService.speak(msg, language);
         }
+        // MEDIUM URGENCY: Close objects
+        else if (obstacles.some(o => o.distance.urgency >= 2) && timeSinceSpoke > 3500) {
+          lastSpokeTimeRef.current = now;
+          const closeObs = obstacles.filter(o => o.distance.urgency >= 2);
+          const top = closeObs[0];
+
+          let msg;
+          if (closeObs.length === 1) {
+            msg = langKey === 'hi'
+              ? `${top.class} ${top.position.hindiZone} paas aa raha hai.`
+              : `${top.class} ${top.distance.label} to your ${top.position.zone}.`;
+          } else {
+            msg = langKey === 'hi'
+              ? `${closeObs.length} cheezein paas hain. ${top.class} ${top.position.hindiZone}.`
+              : `${closeObs.length} obstacles nearby. ${top.class} to your ${top.position.zone}.`;
+          }
+
+          // Add direction suggestion
+          if (safePath !== 'clear' && safePath !== 'straight') {
+            msg += langKey === 'hi'
+              ? ` ${safePath === 'left' ? 'Baayein' : safePath === 'right' ? 'Daayein' : 'Ruko'}.`
+              : ` Move ${safePath}.`;
+          }
+          voiceService.speak(msg, language);
+        }
+        // LOW: Approaching objects
+        else if (obstacles.some(o => o.distance.urgency >= 1) && timeSinceSpoke > 5000) {
+          lastSpokeTimeRef.current = now;
+          const approaching = obstacles.filter(o => o.distance.urgency >= 1);
+          const names = [...new Set(approaching.map(o => o.class))].slice(0, 3);
+          const msg = langKey === 'hi'
+            ? `Aage ${names.join(', ')} hain. Dhyan rakhein.`
+            : `${names.join(', ')} ahead. Stay alert.`;
+          voiceService.speak(msg, language);
+        }
+        // ALL CLEAR: Periodic reassurance
+        else if (obstacles.length === 0 && (now - lastClearAnnounce > 10000) && timeSinceSpoke > 4000) {
+          lastClearAnnounce = now;
+          lastSpokeTimeRef.current = now;
+          voiceService.speak(
+            langKey === 'hi' ? 'Raasta saaf hai. Chalte rahiye.' : 'Path is clear. Keep walking.',
+            language
+          );
+        }
+
+        // ---- Draw path guide overlay ----
+        if (safePath !== 'clear') {
+          ctx.fillStyle = 'rgba(0,0,0,0.5)';
+          ctx.fillRect(canvas.width / 2 - 100, canvas.height - 50, 200, 40);
+          ctx.fillStyle = safePath === 'stop' ? '#ff0000' : '#2ed573';
+          ctx.font = 'bold 22px Arial';
+          ctx.textAlign = 'center';
+          const pathText = safePath === 'left' ? '← GO LEFT' : safePath === 'right' ? 'GO RIGHT →' : safePath === 'stop' ? '🛑 STOP' : '↑ STRAIGHT';
+          ctx.fillText(pathText, canvas.width / 2, canvas.height - 25);
+          ctx.textAlign = 'start';
+        }
+
+        // ---- Periodic AI scene scan for stairs/curbs (every ~12 secs, on frame 60 multiples) ----
+        if (frameCount % 180 === 0) {
+          scanSceneForHazards();
+        }
+
       } catch (err) {
         console.error('AR Loop Error:', err);
       }
@@ -200,7 +411,7 @@ function CameraApp({ mode, onSwitchMode, onResetMode }) {
     };
 
     detectFrame();
-  }, [cameraReady, langKey, language, stopWalkMode]);
+  }, [cameraReady, langKey, language, stopWalkMode, getDangerLevel, estimateDistance, getPosition, findSafePath, scanSceneForHazards]);
 
   // Cleanup on unmount
   useEffect(() => {
