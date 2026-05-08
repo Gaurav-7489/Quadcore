@@ -56,7 +56,7 @@ function SplashScreen({ onSelectMode }) {
 }
 
 // ==================== CAMERA-FIRST APP (Demo + Blind) ====================
-function CameraApp({ mode, onSwitchMode }) {
+function CameraApp({ mode, onSwitchMode, onResetMode }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const modelRef = useRef(null);
@@ -367,8 +367,13 @@ function CameraApp({ mode, onSwitchMode }) {
 
     switch (command.action) {
       case 'navigate':
-        // In camera-first mode, just announce
-        voiceService.speak(command.target === '/sos' ? 'SOS mode not available in camera view. Say SOS to send alert.' : 'Navigation not available in this mode.');
+        // If it's a home/back command, reset to the selection screen
+        if (command.target === '/' || text.includes('home') || text.includes('back') || text.includes('ghar')) {
+           voiceService.speak(langKey === 'hi' ? 'Wapas ja raha hu.' : 'Going back to selection screen.', language);
+           onResetMode();
+        } else {
+           voiceService.speak(command.target === '/sos' ? 'SOS mode not available in camera view. Say SOS to send alert.' : 'Navigation not available in this mode.');
+        }
         break;
       case 'describe_scene':
         handleAction('describe_scene');
@@ -477,6 +482,17 @@ function CameraApp({ mode, onSwitchMode }) {
         </div>
 
         <div className="status-right">
+          <button
+            className="icon-btn"
+            onClick={() => {
+              voiceService.speak('Going back to selection screen');
+              onResetMode();
+            }}
+            aria-label="Go Back"
+            style={{ marginRight: '8px' }}
+          >
+            🏠
+          </button>
           <button
             className={`mode-toggle ${mode === 'blind' ? 'mode-toggle--blind' : ''}`}
             onClick={onSwitchMode}
@@ -645,20 +661,20 @@ function CameraApp({ mode, onSwitchMode }) {
 
 // ==================== MAIN APP ====================
 function App() {
-  const [mode, setMode] = useState(() => {
-    return localStorage.getItem('sv-mode') || null;
-  });
+  const [mode, setMode] = useState(null);
 
   const handleSelectMode = (selectedMode) => {
     setMode(selectedMode);
-    localStorage.setItem('sv-mode', selectedMode);
   };
 
   const handleSwitchMode = () => {
     const newMode = mode === 'demo' ? 'blind' : 'demo';
     setMode(newMode);
-    localStorage.setItem('sv-mode', newMode);
     voiceService.speak(newMode === 'demo' ? 'Switched to demo mode.' : 'Switched to blind mode.');
+  };
+
+  const handleResetMode = () => {
+    setMode(null);
   };
 
   // No mode selected → show splash
@@ -667,7 +683,7 @@ function App() {
   }
 
   // Mode selected → camera-first experience
-  return <CameraApp mode={mode} onSwitchMode={handleSwitchMode} />;
+  return <CameraApp mode={mode} onSwitchMode={handleSwitchMode} onResetMode={handleResetMode} />;
 }
 
 export default App;
