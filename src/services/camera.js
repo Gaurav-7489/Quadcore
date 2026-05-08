@@ -102,21 +102,19 @@ class CameraService {
     if (!track) return false;
 
     try {
-      // Check if browser supports capabilities
-      if (typeof track.getCapabilities !== 'function') return false;
-      
-      const capabilities = track.getCapabilities();
-      if (capabilities.torch) {
-        this.flashlightOn = !this.flashlightOn;
-        await track.applyConstraints({
-          advanced: [{ torch: this.flashlightOn }]
-        });
-        return true;
-      }
+      // Just attempt to apply the constraint directly.
+      // Many mobile browsers support torch but do NOT advertise it in getCapabilities()
+      this.flashlightOn = !this.flashlightOn;
+      await track.applyConstraints({
+        advanced: [{ torch: this.flashlightOn }]
+      });
+      return true;
     } catch (err) {
       console.warn('[Camera] Torch not supported or error:', err);
+      // Revert state if the hardware rejected it
+      this.flashlightOn = !this.flashlightOn;
+      return false;
     }
-    return false;
   }
 }
 
