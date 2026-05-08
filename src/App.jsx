@@ -9,8 +9,6 @@ import {
   askAI,
   detectObjects,
   getLocation,
-  getConnectivityStatus,
-  recheckConnectivity,
 } from './services/api';
 import './App.css';
 
@@ -32,30 +30,9 @@ function App() {
   const [lastCommand, setLastCommand] = useState('');
   const [responseHistory, setResponseHistory] = useState([]);
   const [language, setLanguage] = useState(localStorage.getItem('sv-language') || 'en-US');
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const videoRef = useRef(null);
   const lastResponseRef = useRef('');
   const isProcessingRef = useRef(false);
-
-  // ========== CONNECTIVITY ==========
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // Periodic connectivity check
-    const interval = setInterval(() => {
-      const status = getConnectivityStatus();
-      setIsOnline(status.browserOnline && status.apiReachable !== false);
-    }, 15000);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      clearInterval(interval);
-    };
-  }, []);
 
   // ========== START ==========
   const handleStart = (selectedMode) => {
@@ -149,21 +126,6 @@ function App() {
     if (text.includes('switch mode') || text.includes('demo mode') || text.includes('blind mode')) {
       switchMode(); return;
     }
-    if (text.includes('status') || text.includes('online') || text.includes('connection')) {
-      const status = getConnectivityStatus();
-      const msg = status.apiReachable
-        ? 'You are online. All AI features are available.'
-        : 'You are offline. Using local detection only.';
-      voiceService.speak(msg);
-      return;
-    }
-    if (text.includes('retry') || text.includes('reconnect')) {
-      recheckConnectivity().then(online => {
-        voiceService.speak(online ? 'Connection restored! Online mode active.' : 'Still offline. Using local mode.');
-        setIsOnline(online);
-      });
-      return;
-    }
     if (text.includes('describe') || text.includes('scene') || text.includes('surroundings') ||
         text.includes('what is') || text.includes('kya hai') || text.includes('samne') ||
         text.includes('around') || text.includes('what do you see') || text.includes('kya dikh') ||
@@ -228,51 +190,33 @@ function App() {
       let result;
       const langKey = language === 'hi-IN' ? 'hi' : 'en';
       const frame = cameraService.captureFrame(0.7);
-      const video = videoRef.current;
+      if (!frame) throw new Error('Could not capture frame');
 
       switch (action) {
-        case 'describe_scene':
-          result = await describeScene(frame, langKey, video);
-          break;
-        case 'read_text':
-          result = await readText(frame);
-          break;
-        case 'detect_currency':
-          result = await detectCurrency(frame, langKey, video);
-          break;
-        case 'detect_color':
-          result = await detectColor(frame, langKey);
-          break;
-        case 'detect_objects':
-          result = await detectObjects(frame, langKey, video);
-          break;
-        case 'ask_ai':
-          result = await askAI(frame, query, langKey, video);
-          break;
-        default:
-          result = await describeScene(frame, langKey, video);
+        case 'describe_scene': result = await describeScene(frame, langKey); break;
+        case 'read_text': result = await readText(frame); break;
+        case 'detect_currency': result = await detectCurrency(frame, langKey); break;
+        case 'detect_color': result = await detectColor(frame, langKey); break;
+        case 'detect_objects': result = await detectObjects(frame, langKey); break;
+        case 'ask_ai': result = await askAI(frame, query, langKey); break;
+        default: result = await describeScene(frame, langKey);
       }
-
-      // Update connectivity status based on result
-      const wasOffline = result.startsWith('[Offline]');
-      setIsOnline(!wasOffline);
 
       setLastResponse(result);
       lastResponseRef.current = result;
 
       // Add to history for demo mode
       setResponseHistory(prev => [{
-        label: `${wasOffline ? '📡 ' : ''}${actionLabels[action] || '🧠 AI'}`,
+        label: actionLabels[action] || '🧠 AI',
         text: result,
         time: new Date().toLocaleTimeString(),
         command: query || action.replace('_', ' '),
-        offline: wasOffline,
       }, ...prev].slice(0, 10));
 
       await voiceService.speak(result, language);
     } catch (err) {
       console.error('[App] Error:', err);
-      const errorMsg = 'Sorry, something went wrong. Please try again.';
+      const errorMsg = 'Sorry, something went wrong. Please check your internet connection and try again.';
       setLastResponse(errorMsg);
       await voiceService.speak(errorMsg);
     } finally {
@@ -365,12 +309,6 @@ function App() {
           </span>
         </div>
         <div className="status-right">
-          {/* Online/Offline badge */}
-          <span className={`connectivity-badge ${isOnline ? 'connectivity-badge--online' : 'connectivity-badge--offline'}`}
-                onClick={() => { recheckConnectivity().then(ok => setIsOnline(ok)); }}>
-            {isOnline ? '🌐' : '📡'}
-            <span className="connectivity-label">{isOnline ? 'Online' : 'Offline'}</span>
-          </span>
           <button className={`mode-toggle ${mode === 'blind' ? 'mode-toggle--blind' : ''}`} onClick={switchMode}>
             {mode === 'demo' ? '🖥️ Demo' : '👁️ Blind'}
           </button>
@@ -403,9 +341,6 @@ function App() {
                 {responseHistory[0]?.label || '🧠 AI Response'}
               </span>
               {lastCommand && <span className="demo-response-command">🗣️ "{lastCommand}"</span>}
-              {responseHistory[0]?.offline && (
-                <span className="offline-tag">OFFLINE</span>
-              )}
             </div>
             <p className="demo-response-text">{lastResponse}</p>
           </div>
@@ -433,7 +368,7 @@ function App() {
         <div className="demo-history">
           <div className="demo-history-title">📋 History</div>
           {responseHistory.slice(1, 5).map((item, i) => (
-            <div key={i} className={`demo-history-item ${item.offline ? 'demo-history-item--offline' : ''}`}>
+            <div key={i} className="demo-history-item">
               <span className="demo-history-label">{item.label}</span>
               <p className="demo-history-text">{item.text.substring(0, 80)}...</p>
               <span className="demo-history-time">{item.time}</span>

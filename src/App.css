@@ -625,66 +625,6 @@
   line-height: 1.3;
 }
 
-/* === Connectivity Badge === */
-.connectivity-badge {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.6rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
-}
-
-.connectivity-badge--online {
-  background: rgba(46, 213, 115, 0.12);
-  color: #2ed573;
-  border: 1px solid rgba(46, 213, 115, 0.3);
-}
-
-.connectivity-badge--offline {
-  background: rgba(255, 165, 0, 0.15);
-  color: #ffa500;
-  border: 1px solid rgba(255, 165, 0, 0.4);
-  animation: offlinePulse 2s ease infinite;
-}
-
-.connectivity-label {
-  font-size: 0.55rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  font-weight: 800;
-}
-
-@keyframes offlinePulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
-/* Offline tag in response */
-.offline-tag {
-  font-size: 0.55rem;
-  font-weight: 800;
-  color: #ffa500;
-  background: rgba(255, 165, 0, 0.12);
-  border: 1px solid rgba(255, 165, 0, 0.3);
-  padding: 2px 8px;
-  border-radius: 6px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-/* Offline history item */
-.demo-history-item--offline {
-  border-color: rgba(255, 165, 0, 0.15);
-}
-
-.demo-history-item--offline .demo-history-label {
-  color: rgba(255, 165, 0, 0.7);
-}
 
 /* === Animations === */
 @keyframes float {
