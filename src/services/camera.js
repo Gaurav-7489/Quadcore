@@ -116,6 +116,22 @@ class CameraService {
       return false;
     }
   }
+
+  checkTorchSupport() {
+    if (!this.stream) return false;
+    const track = this.stream.getVideoTracks()[0];
+    if (!track) return false;
+
+    // Check if the browser formally advertises torch support
+    if (typeof track.getCapabilities === 'function') {
+      const caps = track.getCapabilities();
+      if ('torch' in caps) return true;
+    }
+
+    // Fallback: If it's a mobile device, assume it might have a torch (due to buggy browsers)
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    return isMobile;
+  }
 }
 
 const cameraService = new CameraService();

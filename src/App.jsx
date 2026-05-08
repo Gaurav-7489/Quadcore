@@ -67,6 +67,7 @@ function CameraApp({ mode, onSwitchMode, onResetMode }) {
   const abortControllerRef = useRef(null);
 
   const [cameraReady, setCameraReady] = useState(false);
+  const [hasTorch, setHasTorch] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState('idle');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeakingResult, setIsSpeakingResult] = useState(false);
@@ -90,6 +91,7 @@ function CameraApp({ mode, onSwitchMode, onResetMode }) {
         const success = await cameraService.startCamera(videoRef.current);
         setCameraReady(success);
         if (success) {
+          setHasTorch(cameraService.checkTorchSupport());
           if (mode === 'blind') {
             voiceService.speak('Camera ready. I am listening. Say describe scene, read text, detect currency, or ask anything.');
           } else {
@@ -509,16 +511,23 @@ function CameraApp({ mode, onSwitchMode, onResetMode }) {
           >
             🔄
           </button>
-          <button
-            className="icon-btn"
-            onClick={async () => {
-              const ok = await cameraService.toggleFlashlight();
-              voiceService.speak(ok ? 'Flashlight toggled' : 'Not supported');
-            }}
-            aria-label="Toggle flashlight"
-          >
-            🔦
-          </button>
+          {hasTorch && (
+            <button
+              className="icon-btn"
+              onClick={async () => {
+                const ok = await cameraService.toggleFlashlight();
+                if (!ok) {
+                  setHasTorch(false);
+                  voiceService.speak('Flashlight not supported');
+                } else {
+                  voiceService.speak('Flashlight toggled');
+                }
+              }}
+              aria-label="Toggle flashlight"
+            >
+              🔦
+            </button>
+          )}
         </div>
       </div>
 
