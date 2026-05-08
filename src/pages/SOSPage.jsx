@@ -73,27 +73,27 @@ export default function SOSPage() {
       const loc = await getLocation();
       setLocationData(loc);
 
+      // Call our Vercel Backend to log the SOS
+      import('../services/api').then(({ sendSOS }) => sendSOS(loc)).catch(console.error);
+
       const mapsUrl = `https://maps.google.com/?q=${loc.latitude},${loc.longitude}`;
+      const message = `🚨 EMERGENCY! I need help! My location: ${mapsUrl}`;
 
       if (navigator.share) {
         try {
           await navigator.share({
             title: '🚨 EMERGENCY SOS - Second Vision',
-            text: `EMERGENCY! I need help! My location: ${mapsUrl}`,
+            text: message,
             url: mapsUrl,
           });
           voiceService.speak('Emergency alert shared successfully! Help is on the way.');
         } catch {
-          await navigator.clipboard.writeText(
-            `🚨 EMERGENCY! I need help! My location: ${mapsUrl}`
-          );
-          voiceService.speak('Location copied. Share it with your emergency contact.');
+          // Fallback if user cancels share
+          fallbackShare(message);
         }
       } else {
-        await navigator.clipboard.writeText(
-          `🚨 EMERGENCY! I need help! My location: ${mapsUrl}`
-        );
-        voiceService.speak('Location copied to clipboard. Share it with your emergency contact.');
+        // Fallback for desktop browsers
+        fallbackShare(message);
       }
 
       setSent(true);
@@ -103,6 +103,19 @@ export default function SOSPage() {
       setSent(true);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const fallbackShare = async (message) => {
+    try {
+      await navigator.clipboard.writeText(message);
+      voiceService.speak('Location copied. Opening WhatsApp to share with emergency contact.');
+      // Open WhatsApp web/app as a visible fallback action
+      setTimeout(() => {
+        window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+      }, 1500);
+    } catch (e) {
+      console.error('Clipboard failed', e);
     }
   };
 
