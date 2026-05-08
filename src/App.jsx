@@ -221,7 +221,7 @@ function CameraApp({ mode, onSwitchMode, onResetMode }) {
       setProcessingLabel('Loading AI model...');
       try {
         await tf.ready();
-        modelRef.current = await cocossd.load({ base: 'lite_mobilenet_v2' });
+        modelRef.current = await cocossd.load({ base: 'mobilenet_v2' });
         voiceService.speak(langKey === 'hi'
           ? 'Model ready. Mai aapko batata rahunga. Chaliye.'
           : 'Model ready. I will announce obstacles, directions, and hazards. Start walking.');
