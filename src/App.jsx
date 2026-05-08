@@ -511,8 +511,8 @@ function CameraApp({ mode, onSwitchMode, onResetMode }) {
           </button>
           <button
             className="icon-btn"
-            onClick={() => {
-              const ok = cameraService.toggleFlashlight();
+            onClick={async () => {
+              const ok = await cameraService.toggleFlashlight();
               voiceService.speak(ok ? 'Flashlight toggled' : 'Not supported');
             }}
             aria-label="Toggle flashlight"

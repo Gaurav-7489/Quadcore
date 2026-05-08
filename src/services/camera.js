@@ -5,6 +5,7 @@ class CameraService {
     this.stream = null;
     this.videoElement = null;
     this.facingMode = 'environment'; // rear camera by default
+    this.flashlightOn = false;
   }
 
   async startCamera(videoElement) {
@@ -43,6 +44,7 @@ class CameraService {
     if (this.videoElement) {
       this.videoElement.srcObject = null;
     }
+    this.flashlightOn = false;
   }
 
   switchCamera() {
@@ -94,22 +96,25 @@ class CameraService {
     return this.stream !== null && this.stream.active;
   }
 
-  toggleFlashlight() {
+  async toggleFlashlight() {
     if (!this.stream) return false;
     const track = this.stream.getVideoTracks()[0];
     if (!track) return false;
 
     try {
+      // Check if browser supports capabilities
+      if (typeof track.getCapabilities !== 'function') return false;
+      
       const capabilities = track.getCapabilities();
       if (capabilities.torch) {
-        const settings = track.getSettings();
-        track.applyConstraints({
-          advanced: [{ torch: !settings.torch }]
+        this.flashlightOn = !this.flashlightOn;
+        await track.applyConstraints({
+          advanced: [{ torch: this.flashlightOn }]
         });
         return true;
       }
     } catch (err) {
-      console.warn('[Camera] Torch not supported');
+      console.warn('[Camera] Torch not supported or error:', err);
     }
     return false;
   }
