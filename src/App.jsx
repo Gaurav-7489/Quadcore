@@ -222,9 +222,32 @@ function App() {
       await voiceService.speak(result, language);
     } catch (err) {
       console.error('[App] Error:', err);
-      const errorMsg = 'Sorry, something went wrong. Please try again.';
-      setLastResponse(errorMsg);
-      await voiceService.speak(errorMsg);
+      // OFFLINE FALLBACK: If API fails, try local object detection
+      if (action !== 'detect_objects') {
+        try {
+          const offlineMsg = 'Internet not available. Switching to offline object detection.';
+          await voiceService.speak(offlineMsg);
+          const predictions = await detectObjects(videoRef.current);
+          const fallbackResult = formatObjectResults(predictions, language === 'hi-IN' ? 'hi' : 'en');
+          setLastResponse(`[Offline Mode] ${fallbackResult}`);
+          lastResponseRef.current = fallbackResult;
+          setResponseHistory(prev => [{
+            label: '📡 Offline Detection',
+            text: fallbackResult,
+            time: new Date().toLocaleTimeString(),
+            command: 'auto-fallback',
+          }, ...prev].slice(0, 10));
+          await voiceService.speak(fallbackResult, language);
+        } catch {
+          const errorMsg = 'No internet and offline detection failed. Please check your connection.';
+          setLastResponse(errorMsg);
+          await voiceService.speak(errorMsg);
+        }
+      } else {
+        const errorMsg = 'Sorry, something went wrong. Please try again.';
+        setLastResponse(errorMsg);
+        await voiceService.speak(errorMsg);
+      }
     } finally {
       isProcessingRef.current = false;
       setIsProcessing(false);
