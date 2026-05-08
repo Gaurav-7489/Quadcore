@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import voiceService from '../services/voice';
 import { getLocation } from '../services/api';
@@ -10,6 +10,7 @@ export default function SOSPage() {
   const [sent, setSent] = useState(false);
   const [locationData, setLocationData] = useState(null);
   const [countdown, setCountdown] = useState(null);
+  const countdownIntervalRef = useRef(null);
 
   useEffect(() => {
     voiceService.speak('Emergency page opened. Tap the big red button or say SOS to send emergency alert. Say go home to go back.');
@@ -37,6 +38,11 @@ export default function SOSPage() {
     return () => {
       voiceService.onResult = null;
       voiceService.onStatusChange = null;
+      // Clear any running countdown interval on unmount
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
     };
   }, [countdown]);
 
@@ -46,10 +52,16 @@ export default function SOSPage() {
     voiceService.speak('SOS activating in 3 seconds. Say cancel to stop.');
     setCountdown(3);
 
-    const countdownInterval = setInterval(() => {
+    // Clear any existing interval before starting a new one
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+    }
+
+    countdownIntervalRef.current = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
-          clearInterval(countdownInterval);
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
           executeSOS();
           return null;
         }
@@ -60,6 +72,10 @@ export default function SOSPage() {
   };
 
   const cancelSOS = () => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
     setCountdown(null);
     voiceService.speak('SOS cancelled. You are safe.');
   };

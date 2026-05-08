@@ -9,7 +9,6 @@ import {
   detectColor,
   askAI,
   detectObjects,
-  formatObjectResults,
   navigatePath,
 } from '../services/api';
 import * as tf from '@tensorflow/tfjs';
@@ -187,8 +186,9 @@ export default function CameraPage() {
 
       if (action === 'detect_objects') {
         voiceService.speak(langKey === 'hi' ? 'Objects detect kar raha hu...' : 'Detecting objects...');
-        const predictions = await detectObjects(videoRef.current);
-        result = formatObjectResults(predictions, langKey);
+        const frame = cameraService.captureFrame(0.7);
+        if (!frame) throw new Error('Could not capture camera frame');
+        result = await detectObjects(frame, langKey);
       } else {
         const frame = cameraService.captureFrame(0.7);
         if (!frame) {
@@ -294,7 +294,7 @@ export default function CameraPage() {
       voiceService.onResult = null;
       voiceService.onStatusChange = null;
     };
-  }, [cameraReady, language, handleAction]);
+  }, [cameraReady, language, handleAction, handleVoiceCommand]);
 
   const handleVoiceCommand = useCallback((transcript) => {
     const text = transcript.toLowerCase();
