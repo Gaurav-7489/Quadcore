@@ -1,0 +1,73 @@
+.voice-button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  color: var(--bg-primary);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  box-shadow: var(--accent-glow);
+  z-index: 1;
+}
+
+.voice-button:hover {
+  transform: scale(1.05);
+  box-shadow: var(--accent-glow-strong);
+}
+
+.voice-button:active {
+  transform: scale(0.95);
+}
+
+.voice-button--listening {
+  background: linear-gradient(135deg, #00d4ff 0%, #00ff88 100%);
+  box-shadow: 0 0 40px rgba(0, 255, 136, 0.4);
+  animation: pulse-glow 1.5s ease infinite;
+}
+
+.voice-button--speaking {
+  background: linear-gradient(135deg, #7c5cff 0%, #ff6b9d 100%);
+  box-shadow: 0 0 40px rgba(124, 92, 255, 0.4);
+}
+
+.voice-button__icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.voice-button__label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Pulse rings */
+.voice-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 212, 255, 0.4);
+  animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  pointer-events: none;
+}
+
+.voice-ring--1 {
+  animation-delay: 0s;
+}
+
+.voice-ring--2 {
+  animation-delay: 0.4s;
+}
+
+.voice-ring--3 {
+  animation-delay: 0.8s;
+}

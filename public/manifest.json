@@ -1,0 +1,17 @@
+{
+  "name": "Second Vision",
+  "short_name": "SecondVision",
+  "description": "AI-powered voice-first assistant for visually impaired users",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#050810",
+  "theme_color": "#050810",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
