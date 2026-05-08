@@ -12,6 +12,8 @@ import {
   formatObjectResults,
   navigatePath,
 } from '../services/api';
+import * as tf from '@tensorflow/tfjs';
+import * as cocossd from '@tensorflow-models/coco-ssd';
 import VoiceButton from '../components/VoiceButton';
 import ResponseCard from '../components/ResponseCard';
 import './CameraPage.css';
@@ -20,7 +22,12 @@ export default function CameraPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const modelRef = useRef(null);
   const lastResponseRef = useRef('');
+  const arLoopRef = useRef(null);
+  const isNavigatingRef = useRef(false);
+  const lastSpokeTimeRef = useRef(0);
 
   const [cameraReady, setCameraReady] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -33,50 +40,120 @@ export default function CameraPage() {
   );
 
   const [isNavigating, setIsNavigating] = useState(false);
-  const walkLoopRef = useRef(null);
 
   const stopWalkMode = useCallback(() => {
-    if (walkLoopRef.current) {
-      clearTimeout(walkLoopRef.current);
-      walkLoopRef.current = null;
-    }
+    isNavigatingRef.current = false;
     setIsNavigating(false);
+    if (arLoopRef.current) {
+      cancelAnimationFrame(arLoopRef.current);
+      arLoopRef.current = null;
+    }
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
     voiceService.speak(language === 'hi-IN' ? 'Navigation band kar diya.' : 'Walk mode stopped.');
   }, [language]);
 
-  const runWalkLoop = useCallback(async () => {
-    if (!cameraReady || !videoRef.current) return;
-    try {
-      const frame = cameraService.captureFrame(0.5); // Lower quality for speed
-      if (frame) {
-        const langKey = language === 'hi-IN' ? 'hi' : 'en';
-        const direction = await navigatePath(frame, langKey);
-        await voiceService.speak(direction, language);
-        setResponse(`Navigation: ${direction}`);
-        setResponseType('info');
-      }
-    } catch (err) {
-      console.error('Walk mode error:', err);
-    }
-    // Schedule next frame if still active
-    if (walkLoopRef.current !== null) {
-      walkLoopRef.current = setTimeout(runWalkLoop, 2500);
-    }
-  }, [cameraReady, language]);
-
-  const startWalkMode = useCallback(() => {
-    if (!cameraReady) {
+  const startWalkMode = useCallback(async () => {
+    if (!cameraReady || !videoRef.current || !canvasRef.current) {
       voiceService.speak('Camera not ready.');
       return;
     }
+
+    isNavigatingRef.current = true;
     setIsNavigating(true);
-    voiceService.speak(language === 'hi-IN' ? 'Navigation shuru. Chalte rahiye.' : 'Walk mode started. Keep walking.');
-    walkLoopRef.current = setTimeout(runWalkLoop, 1000);
-  }, [cameraReady, language, runWalkLoop]);
+    voiceService.speak(language === 'hi-IN' ? 'Live tracking shuru. Model load ho raha hai...' : 'Live tracking started. Loading AI model...');
+
+    if (!modelRef.current) {
+      setIsProcessing(true);
+      try {
+        await tf.ready();
+        modelRef.current = await cocossd.load({ base: 'lite_mobilenet_v2' });
+        voiceService.speak(language === 'hi-IN' ? 'Ready. Chalte rahiye.' : 'Ready. Keep walking.');
+      } catch (err) {
+        console.error('Failed to load COCO-SSD', err);
+        voiceService.speak('Failed to load live tracking.');
+        stopWalkMode();
+        setIsProcessing(false);
+        return;
+      }
+      setIsProcessing(false);
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    // Match canvas to video exact resolution
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const detectFrame = async () => {
+      if (!isNavigatingRef.current || !modelRef.current) return;
+
+      try {
+        const predictions = await modelRef.current.detect(video);
+        
+        // Clear previous drawings
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        let immediateObstacle = null;
+        
+        predictions.forEach(pred => {
+          const [x, y, width, height] = pred.bbox;
+          // Calculate if object is dangerously close (takes up > 25% of screen area)
+          const areaRatio = (width * height) / (canvas.width * canvas.height);
+          const isImmediate = areaRatio > 0.25;
+          
+          const centerX = x + (width / 2);
+          let position = 'center';
+          if (centerX < canvas.width * 0.33) position = 'left';
+          else if (centerX > canvas.width * 0.66) position = 'right';
+
+          if (isImmediate && (!immediateObstacle || pred.score > immediateObstacle.score)) {
+            immediateObstacle = { ...pred, position };
+          }
+
+          // Draw Bounding Box
+          ctx.strokeStyle = isImmediate ? '#ff4757' : '#2ed573';
+          ctx.lineWidth = isImmediate ? 6 : 3;
+          ctx.strokeRect(x, y, width, height);
+
+          // Draw Label
+          ctx.fillStyle = isImmediate ? '#ff4757' : '#2ed573';
+          ctx.font = 'bold 24px Arial';
+          ctx.fillText(
+            `${pred.class} (${Math.round(pred.score * 100)}%)`, 
+            x, y > 24 ? y - 5 : y + 24
+          );
+        });
+
+        const now = Date.now();
+        if (immediateObstacle && (now - lastSpokeTimeRef.current > 3500)) { // Speak every 3.5s max
+          lastSpokeTimeRef.current = now;
+          const msg = language === 'hi-IN' 
+            ? `Dhyan dein, aapke ${immediateObstacle.position === 'center' ? 'saamne' : immediateObstacle.position === 'left' ? 'baayein' : 'daayein'} ek ${immediateObstacle.class} hai.`
+            : `Caution. ${immediateObstacle.class} immediately to your ${immediateObstacle.position}.`;
+          voiceService.speak(msg);
+        }
+      } catch (err) {
+        console.error('AR Loop Error:', err);
+      }
+
+      if (isNavigatingRef.current) {
+        arLoopRef.current = requestAnimationFrame(detectFrame);
+      }
+    };
+
+    detectFrame();
+  }, [cameraReady, language, stopWalkMode]);
 
   useEffect(() => {
     return () => {
-      if (walkLoopRef.current) clearTimeout(walkLoopRef.current);
+      isNavigatingRef.current = false;
+      if (arLoopRef.current) cancelAnimationFrame(arLoopRef.current);
     };
   }, []);
 
@@ -291,6 +368,20 @@ export default function CameraPage() {
           autoPlay
           playsInline
           muted
+        />
+        <canvas
+          ref={canvasRef}
+          className="camera-canvas-overlay"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            zIndex: 2,
+            objectFit: 'cover'
+          }}
         />
         {!cameraReady && (
           <div className="camera-placeholder">
