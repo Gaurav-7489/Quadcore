@@ -10,6 +10,7 @@ import {
   askAI,
   detectObjects,
   formatObjectResults,
+  navigatePath,
 } from '../services/api';
 import VoiceButton from '../components/VoiceButton';
 import ResponseCard from '../components/ResponseCard';
@@ -31,7 +32,56 @@ export default function CameraPage() {
     localStorage.getItem('sv-language') || 'en-US'
   );
 
+  const [isNavigating, setIsNavigating] = useState(false);
+  const walkLoopRef = useRef(null);
+
+  const stopWalkMode = useCallback(() => {
+    if (walkLoopRef.current) {
+      clearTimeout(walkLoopRef.current);
+      walkLoopRef.current = null;
+    }
+    setIsNavigating(false);
+    voiceService.speak(language === 'hi-IN' ? 'Navigation band kar diya.' : 'Walk mode stopped.');
+  }, [language]);
+
+  const runWalkLoop = useCallback(async () => {
+    if (!cameraReady || !videoRef.current) return;
+    try {
+      const frame = cameraService.captureFrame(0.5); // Lower quality for speed
+      if (frame) {
+        const langKey = language === 'hi-IN' ? 'hi' : 'en';
+        const direction = await navigatePath(frame, langKey);
+        await voiceService.speak(direction, language);
+        setResponse(`Navigation: ${direction}`);
+        setResponseType('info');
+      }
+    } catch (err) {
+      console.error('Walk mode error:', err);
+    }
+    // Schedule next frame if still active
+    if (walkLoopRef.current !== null) {
+      walkLoopRef.current = setTimeout(runWalkLoop, 2500);
+    }
+  }, [cameraReady, language]);
+
+  const startWalkMode = useCallback(() => {
+    if (!cameraReady) {
+      voiceService.speak('Camera not ready.');
+      return;
+    }
+    setIsNavigating(true);
+    voiceService.speak(language === 'hi-IN' ? 'Navigation shuru. Chalte rahiye.' : 'Walk mode started. Keep walking.');
+    walkLoopRef.current = setTimeout(runWalkLoop, 1000);
+  }, [cameraReady, language, runWalkLoop]);
+
+  useEffect(() => {
+    return () => {
+      if (walkLoopRef.current) clearTimeout(walkLoopRef.current);
+    };
+  }, []);
+
   const handleAction = useCallback(async (action, query = '') => {
+    if (isNavigating) stopWalkMode();
     if (isProcessing) {
       voiceService.speak('Please wait, I am still processing.');
       return;
@@ -170,6 +220,12 @@ export default function CameraPage() {
   }, [cameraReady, language, handleAction]);
 
   const handleVoiceCommand = useCallback((transcript) => {
+    const text = transcript.toLowerCase();
+    if (text.includes('walk') || text.includes('navigate') || text.includes('chalo')) {
+      if (!isNavigating) startWalkMode();
+      return;
+    }
+
     const command = voiceService.parseCommand(transcript);
 
     switch (command.action) {
@@ -193,8 +249,12 @@ export default function CameraPage() {
         handleAction('detect_objects');
         break;
       case 'stop':
-        voiceService.stopSpeaking();
-        setIsProcessing(false);
+        if (isNavigating) {
+          stopWalkMode();
+        } else {
+          voiceService.stopSpeaking();
+          setIsProcessing(false);
+        }
         break;
       case 'repeat':
         if (lastResponseRef.current) {
@@ -252,7 +312,7 @@ export default function CameraPage() {
           {/* Always-on indicator */}
           <div className={`camera-live-badge ${isListening ? 'camera-live-badge--active' : ''}`}>
             <span className="camera-live-dot"></span>
-            {voiceStatus === 'speaking' ? 'SPEAKING' : isListening ? 'LISTENING' : 'READY'}
+            {isNavigating ? 'WALKING' : voiceStatus === 'speaking' ? 'SPEAKING' : isListening ? 'LISTENING' : 'READY'}
           </div>
           <div className="camera-overlay-btns">
             <button
@@ -283,8 +343,17 @@ export default function CameraPage() {
       <div className="camera-actions">
         <button
           className="camera-action-btn"
+          onClick={() => isNavigating ? stopWalkMode() : startWalkMode()}
+          disabled={!cameraReady}
+          style={isNavigating ? { borderColor: 'var(--sos-red)', background: 'rgba(255, 71, 87, 0.1)' } : {}}
+        >
+          <span>{isNavigating ? '🛑' : '🚶'}</span>
+          <span>{isNavigating ? 'Stop Walk' : 'Walk'}</span>
+        </button>
+        <button
+          className="camera-action-btn"
           onClick={() => handleAction('describe_scene')}
-          disabled={isProcessing || !cameraReady}
+          disabled={isProcessing || !cameraReady || isNavigating}
         >
           <span>👁️</span>
           <span>Describe</span>
@@ -292,7 +361,7 @@ export default function CameraPage() {
         <button
           className="camera-action-btn"
           onClick={() => handleAction('read_text')}
-          disabled={isProcessing || !cameraReady}
+          disabled={isProcessing || !cameraReady || isNavigating}
         >
           <span>📖</span>
           <span>Read</span>
@@ -300,7 +369,7 @@ export default function CameraPage() {
         <button
           className="camera-action-btn"
           onClick={() => handleAction('detect_currency')}
-          disabled={isProcessing || !cameraReady}
+          disabled={isProcessing || !cameraReady || isNavigating}
         >
           <span>💵</span>
           <span>Currency</span>
@@ -308,7 +377,7 @@ export default function CameraPage() {
         <button
           className="camera-action-btn"
           onClick={() => handleAction('detect_color')}
-          disabled={isProcessing || !cameraReady}
+          disabled={isProcessing || !cameraReady || isNavigating}
         >
           <span>🎨</span>
           <span>Color</span>
@@ -316,7 +385,7 @@ export default function CameraPage() {
         <button
           className="camera-action-btn"
           onClick={() => handleAction('detect_objects')}
-          disabled={isProcessing || !cameraReady}
+          disabled={isProcessing || !cameraReady || isNavigating}
         >
           <span>🪑</span>
           <span>Objects</span>

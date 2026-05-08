@@ -87,6 +87,17 @@ export async function detectObjects(base64Image, language = 'en') {
   return analyzeImage(base64Image, prompts[language] || prompts.en);
 }
 
+// ========== Navigation / Walk Mode ==========
+
+export async function navigatePath(base64Image, language = 'en') {
+  const prompts = {
+    en: "You are guiding a blind person walking forward. Analyze the path immediately ahead in this image. Is there an obstacle? If there is an obstacle, reply with ONLY ONE of these commands: 'Move left', 'Move right', or 'Stop'. If the path is safe to walk, reply ONLY with 'Clear'. Do not explain or add any other words.",
+    hi: "Aap ek andhe insaan ko chalne mein guide kar rahe hain. Image mein aage ka rasta dekhein. Agar koi rukawat hai toh sirf inme se ek command dein: 'Move left' (baayein mudein), 'Move right' (daayein mudein), ya 'Stop' (rukein). Agar rasta saaf hai toh sirf 'Clear' bole. Koi aur shabd na jodein."
+  };
+
+  return analyzeImage(base64Image, prompts[language] || prompts.en);
+}
+
 // ========== SOS ==========
 
 export async function sendSOS(location) {
