@@ -1,24 +1,53 @@
-.camera-page {
-  padding: var(--space-md);
-  padding-bottom: 110px;
+/* 
+   Camera Page Design System 
+   Focus: Fluid scaling, Glassmorphism, and Depth
+*/
+
+:root {
+  /* Fluid Spacing */
+  --space-xs: clamp(0.5rem, 0.4rem + 0.5vw, 0.75rem);
+  --space-sm: clamp(0.75rem, 0.6rem + 0.8vw, 1.25rem);
+  --space-md: clamp(1rem, 0.8rem + 1vw, 1.75rem);
+  --space-lg: clamp(1.5rem, 1.2rem + 1.5vw, 2.5rem);
+  --space-xl: clamp(2rem, 1.5rem + 2.5vw, 4.5rem);
+  
+  /* Typography Scale */
+  --font-size-xs: clamp(0.65rem, 0.6rem + 0.2vw, 0.75rem);
+  --font-size-sm: clamp(0.8rem, 0.75rem + 0.3vw, 0.95rem);
+  --font-size-lg: clamp(1.2rem, 1rem + 1vw, 1.5rem);
+  
+  /* Camera Specifics */
+  --camera-aspect: 4 / 3;
+  --camera-bg-blur: blur(12px);
+  --camera-glass: rgba(0, 0, 0, 0.55);
+  --accent-glow: 0 0 30px rgba(0, 212, 255, 0.15);
 }
 
-/* Camera View */
+.camera-page {
+  padding: var(--space-md);
+  /* Uses clamp for the bottom safe-area/button clearance */
+  padding-bottom: clamp(100px, 15vh, 140px);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Camera View: High-end viewport */
 .camera-view {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--camera-aspect);
   background: #000;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 2px solid rgba(0, 212, 255, 0.15);
-  box-shadow: 0 0 30px rgba(0, 212, 255, 0.1);
+  border: 1.5px solid rgba(0, 212, 255, 0.2);
+  box-shadow: var(--accent-glow);
 }
 
 .camera-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: filter 0.3s ease;
 }
 
 .camera-placeholder {
@@ -29,14 +58,15 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-md);
-  background: rgba(0, 0, 0, 0.8);
+  background: radial-gradient(circle at center, #111, #000);
   color: var(--text-muted);
   font-size: var(--font-size-sm);
 }
 
 .camera-placeholder__icon {
-  font-size: 3rem;
-  animation: pulse-glow 2s ease infinite;
+  font-size: clamp(2.5rem, 2rem + 2vw, 4rem);
+  animation: pulse-glow 2.5s ease-in-out infinite;
+  opacity: 0.6;
 }
 
 /* Processing overlay */
@@ -48,98 +78,102 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-md);
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: var(--camera-bg-blur);
   z-index: 10;
-  animation: fadeIn 0.3s ease;
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .camera-processing-overlay span {
   color: var(--accent-primary);
-  font-weight: 700;
-  font-size: var(--font-size-sm);
+  font-weight: 800;
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
-  letter-spacing: 2px;
+  letter-spacing: 0.25em;
+  text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
 }
 
 .camera-processing-pulse {
-  width: 60px;
-  height: 60px;
+  width: clamp(50px, 8vw, 70px);
+  height: clamp(50px, 8vw, 70px);
   border-radius: 50%;
   background: var(--accent-gradient);
-  animation: pulse-glow 1s ease infinite;
+  animation: pulse-glow 1.2s ease-in-out infinite;
   box-shadow: var(--accent-glow-strong);
 }
 
-/* Camera overlay */
+/* Camera overlay - Controls */
 .camera-overlay-top {
   position: absolute;
-  top: var(--space-md);
-  left: var(--space-md);
-  right: var(--space-md);
+  top: var(--space-sm);
+  left: var(--space-sm);
+  right: var(--space-sm);
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   z-index: 5;
 }
 
 .camera-overlay-btns {
   display: flex;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 }
 
 .camera-btn-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-full);
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(10px);
+  width: clamp(40px, 6vw, 48px);
+  height: clamp(40px, 6vw, 48px);
+  border-radius: 50%;
+  background: var(--camera-glass);
+  backdrop-filter: var(--camera-bg-blur);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all var(--transition-fast);
+  font-size: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   color: white;
 }
 
 .camera-btn-icon:hover {
-  background: rgba(0, 0, 0, 0.7);
-  transform: scale(1.1);
+  background: rgba(0, 212, 255, 0.2);
+  border-color: var(--accent-primary);
+  transform: scale(1.05);
 }
 
 /* Live badge */
 .camera-live-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(10px);
-  font-size: 0.6rem;
-  font-weight: 800;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 100px;
+  background: var(--camera-glass);
+  backdrop-filter: var(--camera-bg-blur);
+  font-size: 0.65rem;
+  font-weight: 850;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
+  letter-spacing: 0.12em;
   color: var(--text-muted);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .camera-live-badge--active {
   color: var(--success);
-  border-color: rgba(46, 213, 115, 0.3);
+  border-color: rgba(46, 213, 115, 0.4);
+  background: rgba(46, 213, 115, 0.05);
 }
 
 .camera-live-dot {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: currentColor;
-  animation: pulse-glow 1.5s ease infinite;
+  box-shadow: 0 0 8px currentColor;
+  animation: pulse-glow 1.5s ease-in-out infinite;
 }
 
-/* Action Buttons */
+/* Action Grid: Modern Horizontal Scroll */
 .camera-actions {
   display: flex;
   gap: var(--space-sm);
@@ -147,7 +181,7 @@
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  padding-bottom: 4px;
+  padding: 4px 2px var(--space-sm) 2px;
 }
 
 .camera-actions::-webkit-scrollbar {
@@ -158,46 +192,49 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 8px;
   padding: var(--space-md);
-  background: var(--bg-card);
-  border: var(--border-subtle);
-  border-radius: var(--radius-sm);
-  min-width: 76px;
+  background: var(--bg-glass);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  min-width: clamp(80px, 12vw, 100px);
   flex-shrink: 0;
-  transition: all var(--transition-normal);
+  transition: all 0.3s ease;
   cursor: pointer;
   color: var(--text-primary);
 }
 
 .camera-action-btn span:first-child {
-  font-size: 1.5rem;
+  font-size: clamp(1.4rem, 1.2rem + 1vw, 1.8rem);
 }
 
 .camera-action-btn span:last-child {
-  font-size: 0.65rem;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   color: var(--text-muted);
 }
 
 .camera-action-btn:hover:not(:disabled) {
-  background: var(--bg-card-hover);
-  border-color: rgba(0, 212, 255, 0.2);
-  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent-primary);
+  transform: translateY(-4px);
 }
 
 .camera-action-btn:active:not(:disabled) {
-  transform: scale(0.95);
+  transform: scale(0.96) translateY(0);
 }
 
 .camera-action-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.3;
   cursor: not-allowed;
+  filter: grayscale(1);
 }
 
-/* Voice Section */
+/* Voice Section: Centerpiece */
 .camera-voice-section {
   display: flex;
   justify-content: center;
@@ -205,14 +242,35 @@
 }
 
 .camera-voice-section .voice-button {
-  width: 100px;
-  height: 100px;
+  width: clamp(90px, 15vw, 120px);
+  height: clamp(90px, 15vw, 120px);
+  border: 4px solid rgba(0, 212, 255, 0.1);
+  box-shadow: 0 0 40px rgba(0, 212, 255, 0.15);
 }
 
 .camera-voice-section .voice-button__icon {
-  font-size: 1.8rem;
+  font-size: clamp(1.6rem, 1.4rem + 1vw, 2.2rem);
 }
 
 .camera-voice-section .voice-button__label {
-  font-size: 0.55rem;
+  font-size: var(--font-size-xs);
+  font-weight: 800;
+}
+
+/* Global Pulse Glow for that 'blessed' vibe */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); filter: brightness(1.3); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Desktop Hover Interaction for Video */
+@media (hover: hover) {
+  .camera-view:hover .camera-video {
+    filter: brightness(1.1);
+  }
 }

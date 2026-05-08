@@ -1,94 +1,132 @@
+/* 
+   SOS Page Design System 
+   Focus: High-Visibility, Urgency, and Fluid Accessibility
+*/
+
+:root {
+  /* Fluid Spacing & Typography */
+  --space-2xl: clamp(3rem, 2rem + 5vh, 8rem);
+  --sos-btn-size: clamp(200px, 40vw, 320px);
+  
+  --font-size-urgent: clamp(1.5rem, 1.2rem + 2vw, 2.5rem);
+  --font-size-countdown: clamp(4rem, 3rem + 4vw, 6rem);
+  
+  /* Color Palette */
+  --sos-red: #ff4757;
+  --sos-red-dark: #c0392b;
+  --sos-green: #2ed573;
+  --sos-orange: #ffa502;
+  --sos-glow: rgba(255, 71, 87, 0.4);
+}
+
 .sos-page {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  padding: var(--space-md);
+  padding-bottom: 120px; /* Clearance for nav */
+  max-width: 600px;
+  margin: 0 auto;
 }
 
-/* SOS Button */
+/* SOS Button Container */
 .sos-button-container {
   margin: var(--space-2xl) 0;
   display: flex;
   justify-content: center;
+  position: relative;
+  width: 100%;
 }
 
 .sos-button {
   position: relative;
-  width: 200px;
-  height: 200px;
+  width: var(--sos-btn-size);
+  height: var(--sos-btn-size);
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff4757 0%, #c0392b 100%);
+  background: linear-gradient(135deg, var(--sos-red) 0%, var(--sos-red-dark) 100%);
   color: white;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border: 4px solid rgba(255, 71, 87, 0.3);
+  border: 4px solid rgba(255, 255, 255, 0.2);
   box-shadow:
-    0 0 40px rgba(255, 71, 87, 0.3),
-    0 0 80px rgba(255, 71, 87, 0.15),
-    inset 0 0 30px rgba(255, 255, 255, 0.05);
+    0 0 40px var(--sos-glow),
+    0 0 80px rgba(255, 71, 87, 0.2),
+    inset 0 0 30px rgba(255, 255, 255, 0.1);
   cursor: pointer;
-  transition: all var(--transition-normal);
-  z-index: 1;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 5;
+  outline: none;
 }
 
 .sos-button:hover:not(:disabled) {
   transform: scale(1.05);
   box-shadow:
-    0 0 60px rgba(255, 71, 87, 0.5),
-    0 0 120px rgba(255, 71, 87, 0.2);
+    0 0 60px rgba(255, 71, 87, 0.6),
+    0 0 120px rgba(255, 71, 87, 0.3);
 }
 
 .sos-button:active:not(:disabled) {
-  transform: scale(0.95);
+  transform: scale(0.92);
+  filter: brightness(0.9);
 }
 
 .sos-button--sent {
-  background: linear-gradient(135deg, #2ed573 0%, #27ae60 100%);
-  border-color: rgba(46, 213, 115, 0.3);
-  box-shadow: 0 0 40px rgba(46, 213, 115, 0.3);
+  background: linear-gradient(135deg, var(--sos-green) 0%, #27ae60 100%);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 40px rgba(46, 213, 115, 0.4);
 }
 
 .sos-button__icon {
-  font-size: 3.5rem;
+  font-size: clamp(3rem, 2.5rem + 2vw, 5rem);
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.2));
 }
 
 .sos-button__text {
-  font-size: 1.5rem;
-  font-weight: 900;
-  letter-spacing: 3px;
+  font-size: var(--font-size-urgent);
+  font-weight: 950;
+  letter-spacing: clamp(2px, 0.5vw, 5px);
+  line-height: 1;
 }
 
 .sos-button__sub {
-  font-size: 0.65rem;
-  font-weight: 600;
-  opacity: 0.7;
+  font-size: clamp(0.6rem, 0.5rem + 0.2vw, 0.8rem);
+  font-weight: 800;
+  opacity: 0.9;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
+  margin-top: 5px;
 }
 
-/* SOS Rings */
+/* SOS Rings: Visual Resonance */
 .sos-ring {
   position: absolute;
-  width: 100%;
-  height: 100%;
+  top: 50%;
+  left: 50%;
+  width: var(--sos-btn-size);
+  height: var(--sos-btn-size);
+  margin-left: calc(var(--sos-btn-size) / -2);
+  margin-top: calc(var(--sos-btn-size) / -2);
   border-radius: 50%;
-  border: 2px solid rgba(255, 71, 87, 0.4);
-  animation: pulse-ring 2.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  border: 2px solid var(--sos-red);
+  animation: pulse-ring 3s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
   pointer-events: none;
+  opacity: 0;
 }
 
 .sos-ring--1 { animation-delay: 0s; }
-.sos-ring--2 { animation-delay: 0.5s; }
+.sos-ring--2 { animation-delay: 0.75s; }
+.sos-ring--3 { animation-delay: 1.5s; }
 
-/* Countdown cancel */
+/* Countdown/Cancel Mode */
 .sos-cancel-btn {
-  width: 200px;
-  height: 200px;
+  width: var(--sos-btn-size);
+  height: var(--sos-btn-size);
   border-radius: 50%;
-  background: linear-gradient(135deg, #ffa502 0%, #e67e22 100%);
+  background: linear-gradient(135deg, var(--sos-orange) 0%, #e67e22 100%);
   color: white;
   display: flex;
   flex-direction: column;
@@ -96,66 +134,118 @@
   justify-content: center;
   gap: 8px;
   cursor: pointer;
-  border: 4px solid rgba(255, 165, 2, 0.3);
-  box-shadow: 0 0 40px rgba(255, 165, 2, 0.3);
-  animation: pulse-glow 0.8s ease infinite;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 50px rgba(255, 165, 2, 0.4);
+  animation: pulse-glow 1s ease infinite;
 }
 
 .sos-countdown {
-  font-size: 4rem;
+  font-size: var(--font-size-countdown);
   font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .sos-cancel-text {
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: clamp(0.7rem, 0.6rem + 0.2vw, 0.9rem);
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
 }
 
-/* Location */
+/* Location Status Card */
 .sos-location {
   display: flex;
   align-items: center;
   gap: var(--space-md);
   padding: var(--space-md) var(--space-lg);
   width: 100%;
-  max-width: 400px;
-}
-
-.sos-location:hover {
-  transform: none;
+  background: var(--bg-glass);
+  backdrop-filter: var(--glass-blur);
+  border: var(--glass-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-lg);
+  transition: all 0.3s ease;
 }
 
 .sos-location span:first-child {
-  font-size: 1.5rem;
+  font-size: 2rem;
+  color: var(--accent-primary);
+}
+
+.sos-location__info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .sos-location__label {
   font-size: var(--font-size-xs);
   color: var(--text-muted);
-  font-weight: 600;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
 }
 
 .sos-location__coords {
   font-size: var(--font-size-sm);
   color: var(--text-primary);
-  font-weight: 500;
+  font-weight: 600;
+  font-family: monospace;
 }
 
-/* Quick actions */
+/* Quick Actions List */
 .sos-quick-actions {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
   width: 100%;
-  max-width: 400px;
   margin-top: var(--space-xl);
 }
 
 .sos-call-btn {
   width: 100%;
-  font-size: var(--font-size-lg) !important;
+  padding: var(--space-md) !important;
+  font-size: var(--font-size-md) !important;
+  font-weight: 800 !important;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  transition: all 0.2s ease;
+}
+
+.sos-call-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Animations */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  80%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 40px rgba(255, 165, 2, 0.4); }
+  50% { transform: scale(1.03); box-shadow: 0 0 60px rgba(255, 165, 2, 0.6); }
+}
+
+/* Screen Size Optimization */
+@media (max-width: 360px) {
+  .sos-button__text {
+    font-size: 1.2rem;
+  }
+  .sos-button__icon {
+    font-size: 2.5rem;
+  }
 }
