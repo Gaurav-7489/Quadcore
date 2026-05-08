@@ -3,58 +3,66 @@
 
 async function callXAIGrok(messages) {
   const apiKey = process.env.XAI_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) return { error: 'Missing XAI_API_KEY in environment' };
 
-  const response = await fetch('https://api.x.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'grok-4.3',
-      messages: messages,
-      max_tokens: 300,
-      temperature: 0.3,
-    }),
-  });
+  try {
+    const response = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'grok-4.3',
+        messages: messages,
+        max_tokens: 300,
+        temperature: 0.3,
+      }),
+    });
 
-  if (!response.ok) {
-    const err = await response.text();
-    console.error('[xAI Grok] Error:', response.status, err);
-    return null;
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('[xAI Grok] Error:', response.status, err);
+      return { error: `HTTP ${response.status}: ${err.substring(0, 100)}` };
+    }
+
+    const data = await response.json();
+    return { result: data.choices?.[0]?.message?.content || null };
+  } catch (e) {
+    return { error: e.message };
   }
-
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || null;
 }
 
 async function callGroq(messages) {
   const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) return { error: 'Missing GROQ_API_KEY in environment' };
 
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      messages: messages,
-      max_tokens: 300,
-      temperature: 0.3,
-    }),
-  });
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        messages: messages,
+        max_tokens: 300,
+        temperature: 0.3,
+      }),
+    });
 
-  if (!response.ok) {
-    const err = await response.text();
-    console.error('[Groq] Error:', response.status, err);
-    return null;
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('[Groq] Error:', response.status, err);
+      return { error: `HTTP ${response.status}: ${err.substring(0, 100)}` };
+    }
+
+    const data = await response.json();
+    return { result: data.choices?.[0]?.message?.content || null };
+  } catch (e) {
+    return { error: e.message };
   }
-
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || null;
 }
 
 export default async function handler(req, res) {
@@ -101,16 +109,41 @@ export default async function handler(req, res) {
 
     console.log(`[Vision] Processing: "${prompt.substring(0, 60)}..."`);
 
-    // Try xAI Grok first (better quality), fallback to Groq (faster)
-    let result = await callXAIGrok(messages);
+    // Try xAI Grok first
+    let result = null;
+    let xaiError = null;
+    let groqError = null;
 
+    try {
+      const response = await callXAIGrok(messages);
+      if (response && response.result) {
+        result = response.result;
+      } else {
+        xaiError = response ? response.error : 'xAI returned null';
+      }
+    } catch (e) {
+      xaiError = e.message;
+    }
+
+    // Fallback to Groq
     if (!result) {
       console.log('[Vision] xAI unavailable, trying Groq...');
-      result = await callGroq(messages);
+      try {
+        const response = await callGroq(messages);
+        if (response && response.result) {
+          result = response.result;
+        } else {
+          groqError = response ? response.error : 'Groq returned null';
+        }
+      } catch (e) {
+        groqError = e.message;
+      }
     }
 
     if (!result) {
-      return res.status(500).json({ error: 'Both AI providers failed. Check API keys.' });
+      const errorDetail = `xAI Error: ${xaiError} | Groq Error: ${groqError}`;
+      console.error('[Vision] Both failed.', errorDetail);
+      return res.status(500).json({ error: `API Error: ${errorDetail}` });
     }
 
     console.log(`[Vision] ✅ Response: "${result.substring(0, 80)}..."`);
