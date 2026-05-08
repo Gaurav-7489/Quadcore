@@ -136,7 +136,7 @@ export default function CameraPage() {
           const msg = language === 'hi-IN' 
             ? `Dhyan dein, aapke ${immediateObstacle.position === 'center' ? 'saamne' : immediateObstacle.position === 'left' ? 'baayein' : 'daayein'} ek ${immediateObstacle.class} hai.`
             : `Caution. ${immediateObstacle.class} immediately to your ${immediateObstacle.position}.`;
-          voiceService.speak(msg);
+          voiceService.speak(msg, language);
         }
       } catch (err) {
         console.error('AR Loop Error:', err);

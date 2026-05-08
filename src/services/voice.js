@@ -154,10 +154,22 @@ class VoiceService {
 
       // Try to find a good voice
       const voices = this.synthesis.getVoices();
-      const targetLang = (lang || this.language).split('-')[0];
-      const preferredVoice = voices.find(v =>
-        v.lang.startsWith(targetLang) && v.localService
-      ) || voices.find(v => v.lang.startsWith(targetLang));
+      const isHindi = (lang || this.language).startsWith('hi');
+      
+      let preferredVoice = null;
+
+      if (isHindi) {
+        // Look specifically for Hindi voices (Google Hindi, Microsoft Hemant, etc)
+        preferredVoice = voices.find(v => v.lang === 'hi-IN' || v.lang === 'hi_IN') ||
+                         voices.find(v => v.name.toLowerCase().includes('hindi')) ||
+                         voices.find(v => v.lang.includes('IN')); // Fallback to Indian English if no true Hindi
+      }
+
+      if (!preferredVoice) {
+        const targetLang = (lang || this.language).split('-')[0];
+        preferredVoice = voices.find(v => v.lang.startsWith(targetLang) && v.localService) || 
+                         voices.find(v => v.lang.startsWith(targetLang));
+      }
 
       if (preferredVoice) {
         utterance.voice = preferredVoice;
