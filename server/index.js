@@ -8,26 +8,20 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+const cors = require("cors");
+
 app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (mobile apps, server-to-server, etc.)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      process.env.FRONTEND_URL,
-    ].filter(Boolean);
-    
-    if (allowedOrigins.includes(origin) || process.env.FRONTEND_URL === '*') {
-      callback(null, true);
-    } else {
-      callback(null, true); // Allow all in dev
-    }
-  },
-  methods: ['GET', 'POST'],
+  origin: [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    process.env.FRONTEND_URL,
+  ].filter(Boolean),
+
+  methods: ["GET", "POST"],
+  credentials: true,
 }));
-app.use(express.json({ limit: '50mb' }));
+
+app.use(express.json({ limit: "50mb" }));
 
 // Health check
 app.get('/', (req, res) => {
