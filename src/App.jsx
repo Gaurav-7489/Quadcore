@@ -415,16 +415,16 @@ function CameraApp({ mode, onSwitchMode, onResetMode }) {
     };
     voiceService.onResult = handleVoiceCommand;
 
-    // Auto-start listening
-    if (!voiceService.isListening && !voiceService.isSpeaking) {
-      setTimeout(() => voiceService.startListening(), 500);
-    }
+    // Configure continuous voice mode based on the app mode
+    // Demo Mode: Tap to talk (continuous = false)
+    // Blind Mode: Always listening (continuous = true)
+    voiceService.setContinuousMode(!isDemo);
 
     return () => {
       voiceService.onResult = null;
       voiceService.onStatusChange = null;
     };
-  }, [handleVoiceCommand]);
+  }, [handleVoiceCommand, isDemo]);
 
   // ---- Language toggle ----
   const toggleLanguage = () => {
