@@ -3,7 +3,7 @@
 // Offline: COCO-SSD object detection + Tesseract.js OCR
 // Auto-switches based on connectivity
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // ========== Connectivity State ==========
 
